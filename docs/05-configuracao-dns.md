@@ -466,7 +466,7 @@ unset CERT_B64 CERT_PWD
 
 > 🔐 **Importante**: nunca commite o `.pfx`, a `.key` ou a senha em repositórios. Em produção, mova essa geração para um pipeline isolado e armazene o cert no Key Vault.
 
-## 5.5 Alternativas para produção
+## 5.6 Alternativas para produção
 
 | Item | Tutorial | Produção |
 |------|----------|----------|
@@ -490,7 +490,7 @@ resource "azurerm_api_management_custom_domain" "this" {
 
 O APIM precisa ter **Managed Identity** com permissão `get` no Key Vault.
 
-## 5.6 Hosts file (fallback de teste)
+## 5.7 Hosts file (fallback de teste)
 
 Se você não tem DNS configurado mas precisa testar rapidamente de uma máquina dentro da VNet:
 
@@ -501,7 +501,7 @@ echo "10.10.1.4 management.api.internal"  | sudo tee -a /etc/hosts
 echo "10.10.1.4 scm.api.internal"         | sudo tee -a /etc/hosts
 ```
 
-## 5.7 ⚠️ Atenção ao cert self-signed
+## 5.8 ⚠️ Atenção ao cert self-signed
 
 Para clientes confiarem no certificado em chamadas HTTPS:
 
