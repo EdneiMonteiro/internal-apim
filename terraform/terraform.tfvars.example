@@ -4,7 +4,7 @@ tenant_id       = "00000000-0000-0000-0000-000000000000"
 location       = "brazilsouth"
 location_short = "brs"
 
-workload    = "internalapim"
+workload    = "internal"
 environment = "dev"
 owner       = "owner"
 
@@ -15,6 +15,12 @@ apim_sku = "Developer_1"
 
 vnet_address_space = ["10.10.0.0/16"]
 apim_subnet_prefix = "10.10.1.0/24"
+
+# TLD privado reservado pela ICANN para uso interno — zero conflito com público.
+custom_domain = "api.internal"
+
+# Senha do PFX self-signed (apenas tutorial; em produção referencie Key Vault).
+cert_password = "<your-pfx-password>"
 
 tags = {
   workload    = "internal-apim"

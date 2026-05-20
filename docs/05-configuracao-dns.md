@@ -1,111 +1,187 @@
-# 5. Configuração de DNS
+# 5. Configuração de DNS — abordagem custom domain
 
 > Esta é a parte que **mais quebra** em deployments de APIM Internal. Leia com atenção.
 
-## 5.1 Por que DNS é crítico
+## 5.1 Por que **NÃO** usar Private DNS Zone em `azure-api.net`
 
-Quando o APIM está em modo Internal:
+Quando o APIM está em modo Internal, é tentador resolver os hostnames default (`<apim-name>.azure-api.net`) através de uma Private DNS Zone na VNet. **Não faça isso**.
 
-- Os endpoints (`*.azure-api.net`) **não são registrados no DNS público**.
-- O APIM **só responde** a requisições endereçadas aos seus hostnames configurados — **não** ao IP privado diretamente.
-- Cabe a **você** garantir que clientes (dentro da VNet, em redes peered, on-prem via VPN/ER) consigam **resolver** os hostnames para o **Private VIP**.
+`azure-api.net` é um domínio público da Microsoft compartilhado por **vários serviços**. Conforme a [documentação oficial](https://learn.microsoft.com/azure/api-management/api-management-using-with-internal-vnet#dns-configuration-for-internal-virtual-network-scenarios):
 
-## 5.2 Hostnames default
+> Creating a Private DNS zone or authoritative forward lookup zone for the apex domain (`azure-api.net`) is not supported and can introduce unintended resolution failures.
+>
+> If a Private DNS zone is created for `azure-api.net`:
+> - The zone becomes authoritative within the customer DNS scope
+> - Public records published by Azure are no longer resolvable
+> - Other Azure services that rely on `*.azure-api.net` may fail name resolution
+> - Customers must implement complex DNS forwarding to public resolvers to avoid breakage
 
-Para um APIM chamado `apim-internalapim-owner-dev`:
+Mesmo zonas sub-FQDN (`<apim>.azure-api.net`) carregam risco operacional — políticas corporativas e zonas privadas com escopo amplo podem terminar quebrando resolução de outros serviços do mesmo provedor de plano de dados.
 
-| Endpoint | Hostname |
-|----------|----------|
-| Gateway | `apim-internalapim-owner-dev.azure-api.net` |
-| Developer portal (clássico) | `apim-internalapim-owner-dev.portal.azure-api.net` |
-| Developer portal (novo) | `apim-internalapim-owner-dev.developer.azure-api.net` |
-| Management endpoint | `apim-internalapim-owner-dev.management.azure-api.net` |
-| Git (configuração) | `apim-internalapim-owner-dev.scm.azure-api.net` |
+✅ **A abordagem recomendada — e que este tutorial implementa — é configurar um custom domain em um TLD privado**, totalmente isolado de `azure-api.net`.
 
-Todos resolvem para o **mesmo Private VIP** (ex: `10.10.1.4`).
+## 5.2 Visão geral da solução
 
-## 5.3 ⚠️ NÃO faça isso
-
-**NUNCA** crie uma Private DNS Zone para `azure-api.net` (apex):
-
-```diff
-- ❌ Private DNS Zone: azure-api.net          (NUNCA)
-+ ✅ Private DNS Zone: apim-internalapim-owner-dev.azure-api.net   (OK)
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Cliente HTTP em VNet/peered/on-prem                         │
+│                                                              │
+│  curl https://apim.api.internal/<api>/...                    │
+└─────────────────────────┬────────────────────────────────────┘
+                          │ resolve apim.api.internal
+                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Azure Private DNS Zone:  api.internal                       │
+│    A apim         → 10.10.1.4                                │
+│    A developer    → 10.10.1.4                                │
+│    A management   → 10.10.1.4                                │
+│    A scm          → 10.10.1.4                                │
+└─────────────────────────┬────────────────────────────────────┘
+                          │ retorna 10.10.1.4 (Private VIP)
+                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│  APIM Internal — custom hostnames                            │
+│    gateway          → apim.api.internal                      │
+│    developer_portal → developer.api.internal                 │
+│    management       → management.api.internal                │
+│    scm              → scm.api.internal                       │
+│                                                              │
+│  Cert TLS: self-signed (tutorial) com SANs para os 4 FQDNs   │
+│            (em prod use cert emitido por CA + Key Vault)     │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-Por que? `azure-api.net` é um domínio público compartilhado por **vários serviços** Microsoft/Azure. Criar uma zone privada para o apex faz com que a sua VNet **deixe de resolver** quaisquer outros `*.azure-api.net` públicos, quebrando dependências silenciosamente.
+> 🔒 **Sobre o TLD `.internal`**: é reservado pela [ICANN](https://www.icann.org/en/board-activities-and-meetings/materials/approved-resolutions-regular-meeting-of-the-icann-board-24-07-2024-en#section1.b) para uso privado (não roteável publicamente). Outras opções: `.home.arpa` (RFC 8375), um subdomínio organizacional sob seu controle (ex: `int.contoso.com`), ou o TLD legado `.local` (não recomendado por conflito com mDNS).
 
-## 5.4 Abordagens recomendadas
+## 5.3 Implementação via Terraform
 
-### Opção A — Private DNS Zone restrita a sub-FQDN
+O `terraform/main.tf` deste repo já implementa toda essa configuração. As 4 partes principais:
 
-Crie uma Private DNS Zone para **apenas o FQDN do seu APIM**:
+### 5.3.1 Certificado self-signed (TLS provider)
+
+```hcl
+resource "tls_private_key" "apim" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "tls_self_signed_cert" "apim" {
+  private_key_pem = tls_private_key.apim.private_key_pem
+
+  subject {
+    common_name  = "apim.api.internal"
+    organization = "Internal APIM Tutorial"
+  }
+
+  validity_period_hours = 8760  # 1 ano
+
+  allowed_uses = ["key_encipherment", "digital_signature", "server_auth"]
+
+  dns_names = [
+    "apim.api.internal",
+    "developer.api.internal",
+    "management.api.internal",
+    "scm.api.internal",
+  ]
+}
+
+resource "pkcs12_from_pem" "apim" {
+  password        = var.cert_password
+  cert_pem        = tls_self_signed_cert.apim.cert_pem
+  private_key_pem = tls_private_key.apim.private_key_pem
+}
+```
+
+### 5.3.2 Custom domain no APIM
+
+```hcl
+resource "azurerm_api_management_custom_domain" "this" {
+  api_management_id = azurerm_api_management.this.id
+
+  gateway {
+    host_name            = "apim.api.internal"
+    certificate          = pkcs12_from_pem.apim.result
+    certificate_password = var.cert_password
+    default_ssl_binding  = true
+  }
+
+  developer_portal { host_name = "developer.api.internal"   ; certificate = pkcs12_from_pem.apim.result ; certificate_password = var.cert_password }
+  management       { host_name = "management.api.internal"  ; certificate = pkcs12_from_pem.apim.result ; certificate_password = var.cert_password }
+  scm              { host_name = "scm.api.internal"         ; certificate = pkcs12_from_pem.apim.result ; certificate_password = var.cert_password }
+}
+```
+
+### 5.3.3 Private DNS Zone em `api.internal`
+
+```hcl
+resource "azurerm_private_dns_zone" "internal" {
+  name                = "api.internal"
+  resource_group_name = azurerm_resource_group.this.name
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "internal" {
+  name                  = "link-vnet-api-internal"
+  resource_group_name   = azurerm_resource_group.this.name
+  private_dns_zone_name = azurerm_private_dns_zone.internal.name
+  virtual_network_id    = azurerm_virtual_network.this.id
+  registration_enabled  = false
+}
+```
+
+### 5.3.4 A records → Private VIP
+
+```hcl
+resource "azurerm_private_dns_a_record" "apim" {
+  for_each            = toset(["apim", "developer", "management", "scm"])
+  name                = each.value
+  zone_name           = azurerm_private_dns_zone.internal.name
+  resource_group_name = azurerm_resource_group.this.name
+  ttl                 = 300
+  records             = azurerm_api_management.this.private_ip_addresses
+}
+```
+
+## 5.4 Alternativas para produção
+
+| Item | Tutorial | Produção |
+|------|----------|----------|
+| Certificado | self-signed via TLS provider | CA confiável (DigiCert, Let's Encrypt, AD CS interna) referenciada no APIM via `key_vault_id` |
+| Senha do PFX | hardcoded em `terraform.tfvars` | Azure Key Vault Secret + variable indireta |
+| TLD privado | `api.internal` | subdomínio sob seu controle (ex: `apim.corp.<empresa>.com`) |
+| DNS | Azure Private DNS Zone | Azure Private DNS Zone **ou** DNS corporativo (BIND/AD) com forwarding |
+
+### Referência via Key Vault (recomendado para produção)
+
+```hcl
+resource "azurerm_api_management_custom_domain" "this" {
+  api_management_id = azurerm_api_management.this.id
+
+  gateway {
+    host_name    = "api.contoso.com"
+    key_vault_id = "https://kv-apim-prd-brs.vault.azure.net/secrets/apim-cert"
+  }
+}
+```
+
+O APIM precisa ter **Managed Identity** com permissão `get` no Key Vault.
+
+## 5.5 Hosts file (fallback de teste)
+
+Se você não tem DNS configurado mas precisa testar rapidamente de uma máquina dentro da VNet:
 
 ```bash
-RG=rg-internalapim-dev-brs
-APIM=apim-internalapim-owner-dev
-ZONE="${APIM}.azure-api.net"
-VIP="10.10.1.4"
-VNET_ID=$(az network vnet show -g $RG -n vnet-internalapim-dev-brs --query id -o tsv)
-
-# Cria a zone restrita ao FQDN do APIM
-az network private-dns zone create -g $RG -n $ZONE
-
-# Linka a VNet à zone
-az network private-dns link vnet create \
-  -g $RG -n link-vnet-${APIM} \
-  --zone-name $ZONE \
-  --virtual-network $VNET_ID \
-  --registration-enabled false
-
-# Cria A records para cada endpoint (todos apontando para o mesmo VIP)
-for host in "@" "portal" "developer" "management" "scm"; do
-  az network private-dns record-set a add-record \
-    -g $RG -z $ZONE -n $host -a $VIP
-done
+echo "10.10.1.4 apim.api.internal"        | sudo tee -a /etc/hosts
+echo "10.10.1.4 developer.api.internal"   | sudo tee -a /etc/hosts
+echo "10.10.1.4 management.api.internal"  | sudo tee -a /etc/hosts
+echo "10.10.1.4 scm.api.internal"         | sudo tee -a /etc/hosts
 ```
 
-### Opção B — DNS corporativo (Active Directory / BIND)
+## 5.6 ⚠️ Atenção ao cert self-signed
 
-Na sua zona DNS corporativa (`corp.contoso.com`, ou diretamente em `azure-api.net` quando você não controla nada Azure que use o domínio), crie **A records explícitos**:
+Para clientes confiarem no certificado em chamadas HTTPS:
 
-```
-apim-internalapim-owner-dev.azure-api.net.              A   10.10.1.4
-apim-internalapim-owner-dev.portal.azure-api.net.       A   10.10.1.4
-apim-internalapim-owner-dev.developer.azure-api.net.    A   10.10.1.4
-apim-internalapim-owner-dev.management.azure-api.net.   A   10.10.1.4
-apim-internalapim-owner-dev.scm.azure-api.net.          A   10.10.1.4
-```
-
-### Opção C — Custom domain
-
-Para evitar lidar com `azure-api.net`, configure um **custom domain**:
-
-1. No APIM → **Custom domains** → adicione, por exemplo, `api.contoso.com`.
-2. Anexe certificado (de PEM/PFX ou referenciado via Key Vault).
-3. No DNS corporativo, crie `api.contoso.com A 10.10.1.4`.
-
-> 💡 Custom domain elimina o problema do apex `azure-api.net`. Recomendado para produção.
-
-## 5.5 Testar resolução
-
-De uma **VM dentro da VNet** (ou peered):
-
-```bash
-nslookup apim-internalapim-owner-dev.azure-api.net
-# deve retornar 10.10.1.4 (ou o VIP que você configurou)
-```
-
-Sem VM, use uma alteração temporária no `/etc/hosts`:
-
-```bash
-echo "10.10.1.4 apim-internalapim-owner-dev.azure-api.net"             | sudo tee -a /etc/hosts
-echo "10.10.1.4 apim-internalapim-owner-dev.portal.azure-api.net"      | sudo tee -a /etc/hosts
-echo "10.10.1.4 apim-internalapim-owner-dev.developer.azure-api.net"   | sudo tee -a /etc/hosts
-echo "10.10.1.4 apim-internalapim-owner-dev.management.azure-api.net"  | sudo tee -a /etc/hosts
-```
-
-> ⚠️ `/etc/hosts` só funciona se a máquina tiver **rota IP** até o Private VIP (mesma VNet, peered, VPN ou ExpressRoute).
+- **Tutorial**: use `curl -k` (ignora validação) ou importe o cert público (`tls_self_signed_cert.apim.cert_pem`) no truststore local.
+- **Produção**: use cert de CA confiável (já confiada pelos clientes).
 
 ---
 

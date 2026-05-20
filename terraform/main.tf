@@ -8,8 +8,17 @@ locals {
   log_name    = "log-${local.base_name}"
   appi_name   = "appi-${local.base_name}"
 
-  # O nome do APIM precisa ser globalmente único. Concatenamos o owner para evitar colisões.
+  # Nome do APIM precisa ser globalmente único. Pattern: apim-<workload>-<owner>-<env>.
+  # Workload "internal" + owner garantem unicidade SEM duplicar a abreviação "apim".
   apim_name = "apim-${var.workload}-${var.owner}-${var.environment}"
+
+  # Hostnames customizados (dentro do TLD privado var.custom_domain)
+  apim_hostnames = {
+    gateway    = "apim.${var.custom_domain}"
+    developer  = "developer.${var.custom_domain}"
+    management = "management.${var.custom_domain}"
+    scm        = "scm.${var.custom_domain}"
+  }
 }
 
 resource "azurerm_resource_group" "this" {
@@ -127,16 +136,16 @@ resource "azurerm_network_security_group" "apim" {
   }
 
   security_rule {
-    name                        = "Outbound-AzureMonitor"
-    priority                    = 130
-    direction                   = "Outbound"
-    access                      = "Allow"
-    protocol                    = "Tcp"
-    source_port_range           = "*"
-    destination_port_ranges     = ["443", "1886"]
-    source_address_prefix       = "VirtualNetwork"
-    destination_address_prefix  = "AzureMonitor"
-    description                 = "Publicação de logs/metrics/Application Insights"
+    name                       = "Outbound-AzureMonitor"
+    priority                   = 130
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_ranges    = ["443", "1886"]
+    source_address_prefix      = "VirtualNetwork"
+    destination_address_prefix = "AzureMonitor"
+    description                = "Publicação de logs/metrics/Application Insights"
   }
 
   security_rule {
@@ -192,4 +201,119 @@ resource "azurerm_api_management_logger" "appi" {
   application_insights {
     instrumentation_key = azurerm_application_insights.this.instrumentation_key
   }
+}
+
+# ============================================================================
+# Certificado self-signed para o custom domain
+# ----------------------------------------------------------------------------
+# Para tutorial usamos um cert self-signed gerado em-runtime pelo Terraform.
+# Para PRODUÇÃO, referencie um certificado emitido por uma CA confiável,
+# armazenado em Azure Key Vault, via property `key_vault_id`.
+# ============================================================================
+
+resource "tls_private_key" "apim" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "tls_self_signed_cert" "apim" {
+  private_key_pem = tls_private_key.apim.private_key_pem
+
+  subject {
+    common_name  = local.apim_hostnames.gateway
+    organization = "Internal APIM Tutorial"
+  }
+
+  validity_period_hours = 8760 # 1 ano
+
+  allowed_uses = [
+    "key_encipherment",
+    "digital_signature",
+    "server_auth",
+  ]
+
+  dns_names = [
+    local.apim_hostnames.gateway,
+    local.apim_hostnames.developer,
+    local.apim_hostnames.management,
+    local.apim_hostnames.scm,
+  ]
+}
+
+resource "pkcs12_from_pem" "apim" {
+  password        = var.cert_password
+  cert_pem        = tls_self_signed_cert.apim.cert_pem
+  private_key_pem = tls_private_key.apim.private_key_pem
+}
+
+# ============================================================================
+# Custom domain no APIM
+# ----------------------------------------------------------------------------
+# Substitui os hostnames default *.azure-api.net pelos do TLD privado.
+# Com isso, NENHUMA Private DNS Zone toca `azure-api.net`.
+# ============================================================================
+
+resource "azurerm_api_management_custom_domain" "this" {
+  api_management_id = azurerm_api_management.this.id
+
+  gateway {
+    host_name                    = local.apim_hostnames.gateway
+    certificate                  = pkcs12_from_pem.apim.result
+    certificate_password         = var.cert_password
+    negotiate_client_certificate = false
+    default_ssl_binding          = true
+  }
+
+  developer_portal {
+    host_name            = local.apim_hostnames.developer
+    certificate          = pkcs12_from_pem.apim.result
+    certificate_password = var.cert_password
+  }
+
+  management {
+    host_name            = local.apim_hostnames.management
+    certificate          = pkcs12_from_pem.apim.result
+    certificate_password = var.cert_password
+  }
+
+  scm {
+    host_name            = local.apim_hostnames.scm
+    certificate          = pkcs12_from_pem.apim.result
+    certificate_password = var.cert_password
+  }
+}
+
+# ============================================================================
+# Private DNS Zone para o TLD privado (api.internal)
+# ----------------------------------------------------------------------------
+# `internal` é um TLD reservado pela ICANN para uso privado — não pode
+# colidir com qualquer DNS público (incluindo azure-api.net).
+# ============================================================================
+
+resource "azurerm_private_dns_zone" "internal" {
+  name                = var.custom_domain
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = var.tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "internal" {
+  name                  = "link-vnet-${replace(var.custom_domain, ".", "-")}"
+  resource_group_name   = azurerm_resource_group.this.name
+  private_dns_zone_name = azurerm_private_dns_zone.internal.name
+  virtual_network_id    = azurerm_virtual_network.this.id
+  registration_enabled  = false
+  tags                  = var.tags
+}
+
+resource "azurerm_private_dns_a_record" "apim" {
+  for_each = local.apim_hostnames
+
+  # `each.value` é o FQDN completo (ex: apim.api.internal).
+  # Removemos o sufixo do zone name para obter o sub-record correto.
+  name                = replace(each.value, ".${var.custom_domain}", "")
+  zone_name           = azurerm_private_dns_zone.internal.name
+  resource_group_name = azurerm_resource_group.this.name
+  ttl                 = 300
+  records             = azurerm_api_management.this.private_ip_addresses
+  tags                = var.tags
 }

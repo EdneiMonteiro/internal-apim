@@ -4,12 +4,14 @@ Este passo-a-passo cria o ambiente **manualmente** via [portal.azure.com](https:
 
 > 💡 Se preferir IaC, pule direto para [04-tutorial-terraform.md](04-tutorial-terraform.md).
 
+> ℹ️ **Sobre custom domain**: este capítulo cria o APIM com os hostnames default (`*.azure-api.net`). A configuração do **custom domain** em TLD privado (recomendada) é coberta em [05-configuracao-dns.md](05-configuracao-dns.md) — execute-a logo após este capítulo.
+
 ## 3.1 Criar o Resource Group
 
 1. No portal, clique em **Create a resource** → **Resource group**.
 2. Preencha:
    - **Subscription**: a sua.
-   - **Resource group**: `rg-internalapim-dev-brs`
+   - **Resource group**: `rg-internal-dev-brs`
    - **Region**: `(South America) Brazil South`
 3. Adicione as tags:
    - `workload=internal-apim`
@@ -21,8 +23,8 @@ Este passo-a-passo cria o ambiente **manualmente** via [portal.azure.com](https:
 
 1. Procure por **Log Analytics workspaces** → **Create**.
 2. Preencha:
-   - **Resource group**: `rg-internalapim-dev-brs`
-   - **Name**: `log-internalapim-dev-brs`
+   - **Resource group**: `rg-internal-dev-brs`
+   - **Name**: `log-internal-dev-brs`
    - **Region**: `Brazil South`
 3. **Pricing tier**: `Pay-as-you-go (Per GB 2018)`.
 4. **Review + create** → **Create**.
@@ -31,19 +33,19 @@ Este passo-a-passo cria o ambiente **manualmente** via [portal.azure.com](https:
 
 1. Procure por **Application Insights** → **Create**.
 2. Preencha:
-   - **Resource group**: `rg-internalapim-dev-brs`
-   - **Name**: `appi-internalapim-dev-brs`
+   - **Resource group**: `rg-internal-dev-brs`
+   - **Name**: `appi-internal-dev-brs`
    - **Region**: `Brazil South`
    - **Resource Mode**: `Workspace-based`
-   - **Log Analytics Workspace**: `log-internalapim-dev-brs`
+   - **Log Analytics Workspace**: `log-internal-dev-brs`
 3. **Review + create** → **Create**.
 
 ## 3.4 Criar a Virtual Network
 
 1. Procure por **Virtual networks** → **Create**.
 2. Aba **Basics**:
-   - **Resource group**: `rg-internalapim-dev-brs`
-   - **Name**: `vnet-internalapim-dev-brs`
+   - **Resource group**: `rg-internal-dev-brs`
+   - **Name**: `vnet-internal-dev-brs`
    - **Region**: `Brazil South`
 3. Aba **IP addresses**:
    - **Address space**: `10.10.0.0/16`
@@ -60,7 +62,7 @@ Este passo-a-passo cria o ambiente **manualmente** via [portal.azure.com](https:
 
 1. Procure por **Network security groups** → **Create**.
 2. Preencha:
-   - **Resource group**: `rg-internalapim-dev-brs`
+   - **Resource group**: `rg-internal-dev-brs`
    - **Name**: `nsg-apim-dev-brs`
    - **Region**: `Brazil South`
 3. **Review + create** → **Create**.
@@ -89,37 +91,39 @@ Na lâmina do NSG → **Outbound security rules** → **+ Add**:
 ### 3.5.3 Associar o NSG à subnet
 
 1. Na lâmina do NSG → **Subnets** → **+ Associate**.
-2. Selecione `vnet-internalapim-dev-brs` → `snet-apim-dev`.
+2. Selecione `vnet-internal-dev-brs` → `snet-apim-dev`.
 3. Clique **OK**.
 
 ## 3.6 Criar o API Management
 
 1. Procure por **API Management services** → **Create**.
 2. Aba **Basics**:
-   - **Resource group**: `rg-internalapim-dev-brs`
+   - **Resource group**: `rg-internal-dev-brs`
    - **Region**: `Brazil South`
-   - **Resource name**: `apim-internalapim-owner-dev` (substitua `owner` pelo seu identificador único)
+   - **Resource name**: `apim-internal-owner-dev` (substitua `owner` pelo seu identificador único)
    - **Organization name**: `Ednei Monteiro`
    - **Administrator email**: seu e-mail
    - **Pricing tier**: `Developer (no SLA)`
 3. Aba **Monitoring**:
-   - **Application Insights**: marque e selecione `appi-internalapim-dev-brs`.
+   - **Application Insights**: marque e selecione `appi-internal-dev-brs`.
 4. Aba **Virtual network**:
    - **Connectivity type**: `Virtual network`
    - **Virtual network type**: `Internal`
-   - Selecione `vnet-internalapim-dev-brs` → `snet-apim-dev`.
+   - Selecione `vnet-internal-dev-brs` → `snet-apim-dev`.
 5. Aba **Managed identity**:
    - **System assigned**: `On`.
 6. **Review + create** → **Create**.
 
 > ⏰ **A provisão leva 30–45 minutos.** Vá tomar um café. ☕
 
-## 3.7 Após a provisão
+## 3.7 Após a provisão — próximos passos
 
 Vá em **API Management** → seu APIM → **Overview** e anote:
 
 - **Public virtual IP address** (saída — só relevante para chamadas outbound do APIM)
 - **Private virtual IP address** (este é o IP que você vai usar nos registros DNS!)
+
+Em seguida, **siga obrigatoriamente** [05-configuracao-dns.md](05-configuracao-dns.md) para configurar **custom domain** em TLD privado — caso contrário, o APIM ficará inalcançável sem hacks no `/etc/hosts`.
 
 > ⚠️ O **test console** no portal **não funciona** em modo Internal. Use o **developer portal** ou faça testes a partir de uma VM dentro da VNet.
 

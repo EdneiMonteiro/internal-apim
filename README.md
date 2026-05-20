@@ -13,6 +13,7 @@ Tutorial completo de como provisionar um **Azure API Management** em modo **Inte
 - Diferença entre os modos **External** e **Internal** de VNet integration do APIM.
 - Quais recursos do Azure são pré-requisito para um APIM Internal.
 - Como configurar **NSG**, **Subnet** e **DNS** para que tudo funcione.
+- **Por que NÃO criar Private DNS Zone em `azure-api.net`** (mesmo em sub-FQDN) e como usar **custom domain** em um TLD privado.
 - Como provisionar o ambiente via **Portal Azure** (visual) **ou** **Terraform** (IaC).
 - Como validar que o APIM está respondendo no VIP privado.
 
@@ -26,7 +27,7 @@ Tutorial completo de como provisionar um **Azure API Management** em modo **Inte
 | 2 | [Arquitetura](docs/02-arquitetura.md) | Diagrama, decisões e nomenclatura CAF |
 | 3 | [Tutorial — Portal Azure](docs/03-tutorial-portal.md) | Passo-a-passo manual via portal |
 | 4 | [Tutorial — Terraform](docs/04-tutorial-terraform.md) | Provisão via IaC |
-| 5 | [Configuração de DNS](docs/05-configuracao-dns.md) | Resolução dos hostnames internos |
+| 5 | [Configuração de DNS](docs/05-configuracao-dns.md) | **Custom domain + Private DNS em `.internal`** (não toca `azure-api.net`) |
 | 6 | [Validação](docs/06-validacao.md) | Como testar o gateway interno |
 | 7 | [Cleanup](docs/07-cleanup.md) | Como destruir o ambiente |
 | 8 | [Evidência da validação](docs/08-evidencia-validacao.md) | Saída real do `terraform apply` (validado em Brazil South) |
@@ -43,7 +44,7 @@ cd internal-apim/terraform
 
 # 1. Configure variáveis
 cp terraform.tfvars.example terraform.tfvars
-# Edite terraform.tfvars com seu publisher_email, subscription, owner etc.
+# Edite terraform.tfvars com publisher_email, subscription, owner, cert_password etc.
 
 # 2. Faça login no Azure
 az login
@@ -59,13 +60,16 @@ Ao final você terá:
 
 | Recurso | Nome (default) | Abreviação CAF |
 |---------|----------------|----------------|
-| Resource Group | `rg-internalapim-dev-brs` | `rg` |
-| Virtual Network | `vnet-internalapim-dev-brs` | `vnet` |
+| Resource Group | `rg-internal-dev-brs` | `rg` |
+| Virtual Network | `vnet-internal-dev-brs` | `vnet` |
 | Subnet | `snet-apim-dev` | `snet` |
 | Network Security Group | `nsg-apim-dev-brs` | `nsg` |
-| API Management | `apim-internalapim-owner-dev` | `apim` |
-| Log Analytics Workspace | `log-internalapim-dev-brs` | `log` |
-| Application Insights | `appi-internalapim-dev-brs` | `appi` |
+| API Management | `apim-internal-owner-dev` | `apim` |
+| Log Analytics Workspace | `log-internal-dev-brs` | `log` |
+| Application Insights | `appi-internal-dev-brs` | `appi` |
+| Private DNS Zone | `api.internal` | — |
+
+E o APIM acessível via `https://apim.api.internal` (somente de dentro da VNet).
 
 ---
 
@@ -88,8 +92,8 @@ Ao final você terá:
 >
 > - `provisioningState = Succeeded`
 > - `vnetType = Internal`
-> - Tempo total: ~30 minutos (APIM) + ~1 minuto (demais recursos)
-> - 9 recursos Terraform criados sem erro
+> - Custom domain configurado em `api.internal` (sem zonas em `azure-api.net`)
+> - Cert self-signed gerado pelo Terraform via provider `tls` + `chilicat/pkcs12`
 
 ---
 

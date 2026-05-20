@@ -18,7 +18,7 @@ Confirme com `yes`. A destruição completa leva ~15-20 minutos (a maior parte �
 Se você criou via portal, basta deletar o Resource Group:
 
 ```bash
-RG=rg-internalapim-dev-brs
+RG=rg-internal-dev-brs
 
 # Confirme antes
 az resource list -g $RG -o table
@@ -36,7 +36,7 @@ O Azure mantém o nome do APIM **reservado por 48h** após a deleção (soft-del
 az apim deletedservice list -o table
 
 # Purgar permanentemente
-az apim deletedservice purge --location brazilsouth --service-name apim-internalapim-owner-dev
+az apim deletedservice purge --location brazilsouth --service-name apim-internal-owner-dev
 ```
 
 > ⚠️ Soft-delete não gera custo. Mas se você quer recriar **na hora**, é preciso purgar.
@@ -52,9 +52,32 @@ rm -rf .terraform/
 ## 7.5 Verificação final
 
 ```bash
-az group exists -n rg-internalapim-dev-brs
+az group exists -n rg-internal-dev-brs
 # false → cleanup OK
 ```
+
+## 7.6 Sobre recursos órfãos do Application Insights
+
+⚠️ O Application Insights cria automaticamente uma regra de alerta (`Failure Anomalies - <nome>`) que **não fica no state do Terraform**. Sem ajuste, o `terraform destroy` falha com:
+
+```
+Error: deleting Resource Group: still contains Resources
+  * .../microsoft.alertsmanagement/smartDetectorAlertRules/Failure Anomalies - ...
+```
+
+A correção está no `terraform/providers.tf` deste repo:
+
+```hcl
+provider "azurerm" {
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
+}
+```
+
+Com isso o Terraform delega ao Azure a deleção do RG, que limpa os recursos implícitos junto.
 
 ---
 

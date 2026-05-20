@@ -21,9 +21,9 @@ variable "location_short" {
 }
 
 variable "workload" {
-  description = "Nome curto do workload, usado nos nomes dos recursos."
+  description = "Nome curto do workload, usado nos nomes dos recursos. Use algo SEM duplicação com a abreviação CAF do recurso (ex: 'internal', não 'internalapim')."
   type        = string
-  default     = "internalapim"
+  default     = "internal"
 }
 
 variable "environment" {
@@ -69,6 +69,22 @@ variable "apim_subnet_prefix" {
   description = "Prefixo CIDR da subnet dedicada ao APIM (mínimo /29 recomendado)."
   type        = string
   default     = "10.10.1.0/24"
+}
+
+variable "custom_domain" {
+  description = <<-EOT
+    Domínio privado para os hostnames do APIM em modo Internal.
+    Use um TLD reservado para uso privado (`.internal` é reservado pela ICANN, RFC 6762/RFC 8375 recomenda `.home.arpa` ou organizacional).
+    NUNCA use `azure-api.net` ou domínios públicos sob seu controle aqui — esse domínio será criado como Private DNS Zone na VNet.
+  EOT
+  type        = string
+  default     = "api.internal"
+}
+
+variable "cert_password" {
+  description = "Senha do PFX self-signed gerado para o custom domain. Para produção, referencie um Key Vault em vez de hardcoded."
+  type        = string
+  sensitive   = true
 }
 
 variable "tags" {

@@ -8,25 +8,24 @@ output "apim_name" {
   value       = azurerm_api_management.this.name
 }
 
-output "apim_gateway_url" {
-  description = "URL do gateway (FQDN default)."
-  value       = azurerm_api_management.this.gateway_url
-}
-
 output "apim_private_ip_addresses" {
-  description = "Endereços IP privados (Virtual IP) do APIM. Use estes IPs nos registros DNS."
+  description = "Endereços IP privados (Virtual IP) do APIM. Usados nos registros DNS."
   value       = azurerm_api_management.this.private_ip_addresses
 }
 
-output "apim_default_hostnames" {
-  description = "Hostnames default que precisam ser mapeados no DNS interno → Private VIP."
-  value = {
-    gateway    = "${azurerm_api_management.this.name}.azure-api.net"
-    portal     = "${azurerm_api_management.this.name}.portal.azure-api.net"
-    developer  = "${azurerm_api_management.this.name}.developer.azure-api.net"
-    management = "${azurerm_api_management.this.name}.management.azure-api.net"
-    scm        = "${azurerm_api_management.this.name}.scm.azure-api.net"
-  }
+output "apim_custom_hostnames" {
+  description = "Hostnames customizados configurados no APIM (todos resolvidos pela Private DNS Zone)."
+  value       = local.apim_hostnames
+}
+
+output "apim_gateway_custom_url" {
+  description = "URL do gateway usando o custom domain (acessível somente de dentro da VNet)."
+  value       = "https://${local.apim_hostnames.gateway}"
+}
+
+output "private_dns_zone" {
+  description = "Nome da Private DNS Zone privada criada."
+  value       = azurerm_private_dns_zone.internal.name
 }
 
 output "vnet_name" {

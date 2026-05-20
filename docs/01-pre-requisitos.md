@@ -44,6 +44,10 @@ Para este tutorial usamos **Developer_1**.
 - O Load Balancer interno é seguro por padrão e **rejeita todo inbound** que não esteja explicitamente liberado.
 - Regras mínimas exigidas (mais detalhes em [02-arquitetura.md](02-arquitetura.md)).
 
+### Custom domain (recomendado) + Private DNS Zone em TLD privado
+- Em modo Internal, configure **custom domain** em um TLD privado (`.internal`) — evita por completo zonas DNS em `azure-api.net`.
+- Detalhes em [05-configuracao-dns.md](05-configuracao-dns.md).
+
 ### Public IP (opcional)
 - Desde **maio/2024** **não é mais necessário** fornecer um Public IP em modo Internal.
 - Só forneça um Public IP Standard SKU se quiser controlar o IP público de saída do APIM.
@@ -54,10 +58,10 @@ Para este tutorial usamos **Developer_1**.
 |---------|---------|
 | Log Analytics Workspace | Centralizar logs do APIM e do Application Insights |
 | Application Insights | Telemetria detalhada por API (latência, erros, requests) |
-| Key Vault | Guardar segredos, certificados de domínio customizado |
-| Private DNS Zone (escopo restrito) | Resolução dos hostnames internos do APIM |
+| Key Vault | Guardar segredos, **certificados de domínio customizado em produção** |
+| Private DNS Zone (em TLD privado, ex: `api.internal`) | Resolução dos hostnames customizados do APIM |
 
-> ⚠️ **NUNCA** crie uma Private DNS Zone para o domínio **apex** `azure-api.net` — isso quebra a resolução de outros serviços Azure que dependem do domínio público. Veja detalhes em [05-configuracao-dns.md](05-configuracao-dns.md).
+> ⚠️ **NUNCA** crie uma Private DNS Zone para o domínio **apex** `azure-api.net` — isso quebra a resolução de outros serviços Azure que dependem do domínio público. Em vez disso, configure **custom domain** em um TLD privado. Veja detalhes em [05-configuracao-dns.md](05-configuracao-dns.md).
 
 ## 1.5 Ferramentas locais (para Terraform)
 
