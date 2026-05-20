@@ -8,7 +8,7 @@ workload    = "internal"
 environment = "dev"
 owner       = "owner"
 
-publisher_name  = "Ednei Monteiro"
+publisher_name  = "Your Name"
 publisher_email = "you@example.com"
 
 apim_sku = "Developer_1"

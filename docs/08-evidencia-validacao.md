@@ -65,7 +65,7 @@ $ az apim show -g rg-internal-dev-brs -n apim-internal-owner-dev \
   "name": "apim-internal-owner-dev",
   "privateIPs": ["10.10.1.4"],
   "provisioningState": "Succeeded",
-  "publicIPs": ["REDACTED-PUBLIC-IP"],
+  "publicIPs": ["<redacted-public-ip>"],
   "sku": "Developer",
   "vnetType": "Internal"
 }
