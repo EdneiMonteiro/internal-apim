@@ -464,7 +464,7 @@ rm -rf /tmp/apim-cert
 unset CERT_B64 CERT_PWD
 ```
 
-> 🔐 **Importante**: nunca commite o `.pfx`, a `.key` ou a senha em repositórios. Em produção, mova essa geração para um pipeline isolado e armazene o cert no Key Vault.
+> 🔐 **Importante**: nunca faça commit do `.pfx`, da `.key` ou da senha em repositórios. Em produção, mova essa geração para um pipeline isolado e armazene o cert no Key Vault.
 
 ## 5.6 Alternativas para produção
 
