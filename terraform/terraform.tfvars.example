@@ -1,0 +1,24 @@
+subscription_id = "00000000-0000-0000-0000-000000000000"
+tenant_id       = "00000000-0000-0000-0000-000000000000"
+
+location       = "brazilsouth"
+location_short = "brs"
+
+workload    = "internalapim"
+environment = "dev"
+owner       = "owner"
+
+publisher_name  = "Ednei Monteiro"
+publisher_email = "you@example.com"
+
+apim_sku = "Developer_1"
+
+vnet_address_space = ["10.10.0.0/16"]
+apim_subnet_prefix = "10.10.1.0/24"
+
+tags = {
+  workload    = "internal-apim"
+  environment = "dev"
+  managedBy   = "terraform"
+  purpose     = "tutorial"
+}
