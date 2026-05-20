@@ -2,6 +2,8 @@
 
 Tutorial completo de como provisionar um **Azure API Management** em modo **Internal VNet** — com explicação dos pré-requisitos, passo-a-passo via Portal e **Infrastructure as Code (Terraform)** pronto para uso.
 
+> ⚠️ Este repositório é um **tutorial / prova de conceito**. Antes de usar em produção, revise: segurança, escalabilidade, observabilidade, custos e conformidade. Veja [DISCLAIMER.md](./DISCLAIMER.md) e [SUPPORT.md](./SUPPORT.md).
+
 > 📖 Baseado na documentação oficial: [Deploy your Azure API Management instance to a virtual network — internal mode](https://learn.microsoft.com/en-us/azure/api-management/api-management-using-with-internal-vnet)
 >
 > 🏷️ Convenção de nomenclatura: [Cloud Adoption Framework — Resource abbreviations](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/resource-abbreviations)
@@ -87,3 +89,11 @@ E o APIM acessível via `https://apim.api.internal` (somente de dentro da VNet).
 ## 🛡️ Licença
 
 Este projeto está licenciado sob os termos da licença incluída em [LICENSE](LICENSE).
+
+---
+
+## Suporte e Aviso Legal
+
+- Sem SLA nem suporte oficial. Veja [SUPPORT.md](./SUPPORT.md).
+- Uso sujeito a [DISCLAIMER.md](./DISCLAIMER.md).
+- **Não afiliado nem endossado pela Microsoft.** Marcas usadas apenas para descrição.
