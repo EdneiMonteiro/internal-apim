@@ -29,6 +29,7 @@ Tutorial completo de como provisionar um **Azure API Management** em modo **Inte
 | 5 | [Configuração de DNS](docs/05-configuracao-dns.md) | Resolução dos hostnames internos |
 | 6 | [Validação](docs/06-validacao.md) | Como testar o gateway interno |
 | 7 | [Cleanup](docs/07-cleanup.md) | Como destruir o ambiente |
+| 8 | [Evidência da validação](docs/08-evidencia-validacao.md) | Saída real do `terraform apply` (validado em Brazil South) |
 
 ---
 
@@ -78,6 +79,17 @@ Ao final você terá:
 | Premium_1 | ✅ | ~$2,800/mês |
 
 > 💡 Para tutoriais e ambientes de aprendizado use **Developer_1** — mesma feature set do Premium mas sem SLA e ~50x mais barato.
+
+---
+
+## ✅ Status da validação
+
+> Este tutorial foi **validado com uma execução real** em `Brazil South` usando a SKU `Developer_1`. Veja a saída completa em [docs/08-evidencia-validacao.md](docs/08-evidencia-validacao.md).
+>
+> - `provisioningState = Succeeded`
+> - `vnetType = Internal`
+> - Tempo total: ~30 minutos (APIM) + ~1 minuto (demais recursos)
+> - 9 recursos Terraform criados sem erro
 
 ---
 

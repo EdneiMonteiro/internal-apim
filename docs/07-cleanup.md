@@ -58,4 +58,4 @@ az group exists -n rg-internalapim-dev-brs
 
 ---
 
-⬅️ Anterior: [Validação](06-validacao.md) | 🏠 [Voltar ao README](../README.md)
+⬅️ Anterior: [Validação](06-validacao.md) | ➡️ Próximo: [Cleanup](07-cleanup.md)
