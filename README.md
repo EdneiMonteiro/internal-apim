@@ -1,4 +1,4 @@
-# Internal APIM no Azure — Tutorial passo a passo (PT-BR)
+# Internal APIM no Azure
 
 Tutorial completo de como provisionar um **Azure API Management** em modo **Internal VNet** — com explicação dos pré-requisitos, passo-a-passo via Portal e **Infrastructure as Code (Terraform)** pronto para uso.
 
