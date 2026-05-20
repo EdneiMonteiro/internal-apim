@@ -141,11 +141,141 @@ resource "azurerm_private_dns_a_record" "apim" {
 }
 ```
 
-## 5.4 Implementação via Azure CLI (terminal)
+## 5.4 Implementação via Portal Azure
+
+Se você prefere a interface gráfica, siga estes passos. A ordem é importante: **gere o cert primeiro**, depois crie a Private DNS Zone, e por último configure o custom domain no APIM (o passo mais demorado — leva ~20–30 min de propagação).
+
+### 5.4.1 Gerar o certificado self-signed (Cloud Shell)
+
+O Portal Azure traz o **Cloud Shell** integrado (ícone `>_` no topo da página). Abra-o em modo **Bash** e execute:
+
+```bash
+DOMAIN=api.internal
+CERT_PWD="<your-pfx-password>"
+
+mkdir -p ~/apim-cert && cd ~/apim-cert
+
+openssl genrsa -out apim.key 2048
+
+cat > openssl.cnf <<EOF
+[req]
+distinguished_name = req_distinguished_name
+req_extensions     = v3_req
+prompt             = no
+
+[req_distinguished_name]
+CN = apim.${DOMAIN}
+O  = Internal APIM Tutorial
+
+[v3_req]
+keyUsage         = keyEncipherment, digitalSignature
+extendedKeyUsage = serverAuth
+subjectAltName   = @alt_names
+
+[alt_names]
+DNS.1 = apim.${DOMAIN}
+DNS.2 = developer.${DOMAIN}
+DNS.3 = management.${DOMAIN}
+DNS.4 = scm.${DOMAIN}
+EOF
+
+openssl req -new -x509 -days 365 -key apim.key -out apim.crt -config openssl.cnf -extensions v3_req
+openssl pkcs12 -export -inkey apim.key -in apim.crt -out apim.pfx -passout pass:"$CERT_PWD"
+
+# Baixe o .pfx para sua máquina:
+download ~/apim-cert/apim.pfx
+```
+
+> 💡 O Portal **não tem um botão "gerar self-signed"** — ele aceita o arquivo `.pfx` em upload na hora de configurar o custom domain. O Cloud Shell é a forma mais prática de gerar o cert sem sair do navegador.
+
+### 5.4.2 Criar a Private DNS Zone
+
+1. No portal, **Create a resource** → procure por **Private DNS zone** → **Create**.
+2. Preencha:
+   - **Subscription**: a sua.
+   - **Resource group**: `rg-internal-dev-brs`
+   - **Name**: `api.internal`
+3. **Review + create** → **Create**.
+
+### 5.4.3 Vincular a Private DNS Zone à VNet
+
+1. Vá em `api.internal` → no menu lateral, **Virtual network links** → **+ Add**.
+2. Preencha:
+   - **Link name**: `link-vnet-api-internal`
+   - **Subscription**: a sua.
+   - **Virtual network**: `vnet-internal-dev-brs`
+   - **Enable auto registration**: **desmarcado** (não queremos auto-registro)
+3. Clique **OK**.
+
+### 5.4.4 Criar os A records → Private VIP
+
+Antes, pegue o Private VIP do APIM:
+
+1. Vá em **API Management services** → `apim-internal-owner-dev` → **Overview**.
+2. Anote o **Private virtual IP address** (ex: `10.10.1.4`).
+
+Agora, em `api.internal`:
+
+1. Na lâmina da zone, clique em **+ Record set**.
+2. Crie um record set para cada host:
+
+| Name | Type | TTL | TTL Unit | IP Address |
+|------|------|-----|----------|-----------|
+| `apim` | A | 300 | Seconds | `10.10.1.4` |
+| `developer` | A | 300 | Seconds | `10.10.1.4` |
+| `management` | A | 300 | Seconds | `10.10.1.4` |
+| `scm` | A | 300 | Seconds | `10.10.1.4` |
+
+> 💡 Repita 4 vezes (uma por host). Não use `@` — esses são sub-records dentro da zone `api.internal`.
+
+### 5.4.5 Configurar o custom domain no APIM
+
+1. Vá em **API Management services** → seu APIM → menu lateral **Deployment + infrastructure** → **Custom domains**.
+2. Clique em **+ Add**.
+3. Para cada um dos 4 endpoint types, repita:
+
+| Type | Hostname | Certificate source | Arquivo |
+|------|----------|-------------------|---------|
+| **Gateway** | `apim.api.internal` | Custom | `apim.pfx` (gerado em 5.4.1) |
+| **Developer portal** | `developer.api.internal` | Custom | `apim.pfx` (o mesmo cert tem SANs para todos) |
+| **Management** | `management.api.internal` | Custom | `apim.pfx` |
+| **SCM** | `scm.api.internal` | Custom | `apim.pfx` |
+
+Para cada entrada:
+
+- **Type**: selecione o tipo (Gateway / Developer portal / Management / SCM).
+- **Hostname**: o FQDN customizado.
+- **Certificate**: **Custom**.
+- **Certificate file**: faça upload do `apim.pfx`.
+- **Certificate password**: `<your-pfx-password>` (o que você definiu em 5.4.1).
+- **Default SSL binding** (apenas no Gateway): marque ✅.
+- **Negotiate client certificate** (apenas no Gateway): deixe desmarcado.
+
+4. Clique **Save** ao final.
+
+> ⏰ **A operação dispara um rebuild do cluster TLS do APIM e leva 20–30 minutos**. Acompanhe pelo ícone de notificações (sininho) no topo do portal.
+
+### 5.4.6 Validar pelo portal
+
+Depois que o status sair de "Updating" e voltar para "Online":
+
+1. **Custom domains** deve listar os 4 hostnames com cert válido.
+2. Em **Overview**, o **Gateway URL** ainda mostra o `*.azure-api.net` (default, como alias interno) — isso é normal. O cliente usa o custom hostname.
+
+Validação por linha de comando (do Cloud Shell ou de uma VM dentro da VNet):
+
+```bash
+az apim show -g rg-internal-dev-brs -n apim-internal-owner-dev \
+  --query "hostnameConfigurations[].{type:type, host:hostName}" -o table
+```
+
+Deve listar os 4 custom hostnames.
+
+## 5.5 Implementação via Azure CLI (terminal)
 
 Se você não usa Terraform — ou quer entender o que cada bloco do IaC faz — execute os passos abaixo no shell. Os comandos assumem variáveis exportadas e que você já tem o APIM provisionado.
 
-### 5.4.1 Variáveis base
+### 5.5.1 Variáveis base
 
 ```bash
 export SUBSCRIPTION_ID="<sua-subscription-id>"
@@ -168,7 +298,7 @@ export APIM_VIP=$(az apim show -g "$RG" -n "$APIM" \
 echo "Private VIP: $APIM_VIP"
 ```
 
-### 5.4.2 Gerar certificado self-signed (OpenSSL)
+### 5.5.2 Gerar certificado self-signed (OpenSSL)
 
 ```bash
 # Cria diretório de trabalho temporário
@@ -219,7 +349,7 @@ export CERT_B64=$(base64 -i apim.pfx | tr -d '\n')
 echo "Cert PFX gerado e codificado em base64 (${#CERT_B64} chars)"
 ```
 
-### 5.4.3 Criar a Private DNS Zone
+### 5.5.3 Criar a Private DNS Zone
 
 ```bash
 az network private-dns zone create \
@@ -227,7 +357,7 @@ az network private-dns zone create \
   --name "$DOMAIN"
 ```
 
-### 5.4.4 Vincular a Private DNS Zone à VNet
+### 5.5.4 Vincular a Private DNS Zone à VNet
 
 ```bash
 VNET_ID=$(az network vnet show -g "$RG" -n "$VNET" --query id -o tsv)
@@ -240,7 +370,7 @@ az network private-dns link vnet create \
   --registration-enabled false
 ```
 
-### 5.4.5 Criar os A records → Private VIP
+### 5.5.5 Criar os A records → Private VIP
 
 ```bash
 for host in apim developer management scm; do
@@ -270,7 +400,7 @@ management  10.10.1.4
 scm         10.10.1.4
 ```
 
-### 5.4.6 Configurar custom domain no APIM
+### 5.5.6 Configurar custom domain no APIM
 
 > ⚠️ Esta operação aciona um **rebuild do cluster TLS** do APIM e leva **~20–30 minutos**.
 
@@ -312,7 +442,7 @@ az apim update \
 
 > 💡 Em ambientes de produção, use `--key-vault-url` em vez de `encodedCertificate` para referenciar um cert armazenado no Key Vault. O APIM precisa ter Managed Identity com permissão `get` no Key Vault.
 
-### 5.4.7 Validar a configuração final
+### 5.5.7 Validar a configuração final
 
 ```bash
 # Hostnames aplicados
@@ -326,7 +456,7 @@ nslookup "apim.${DOMAIN}"
 curl -k -i "https://apim.${DOMAIN}/status-0123456789abcdef"
 ```
 
-### 5.4.8 Limpeza dos arquivos temporários do cert
+### 5.5.8 Limpeza dos arquivos temporários do cert
 
 ```bash
 cd ~
