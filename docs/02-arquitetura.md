@@ -50,8 +50,6 @@ Seguimos as abreviações oficiais do [Cloud Adoption Framework](https://learn.m
 | Application Insights | `appi` | `appi-<workload>-<env>-<region>` | `appi-internal-dev-brs` |
 | Public IP (se usado) | `pip` | `pip-<workload>-<env>-<region>` | `pip-internal-dev-brs` |
 
-> ⚠️ **Atenção à duplicação de abreviação**: NÃO use `workload=internalapim` quando o recurso já se chama `apim`, pois o resultado fica `apim-internalapim-...` (feio). Prefira **`workload=internal`** ou outro nome semântico.
-
 > 💡 O nome do APIM precisa ser **globalmente único** (DNS public). Por isso incluímos o `<owner>` no padrão — evita colisões em ambientes compartilhados.
 
 ## 2.3 Decisões de design
