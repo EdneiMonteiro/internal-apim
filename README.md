@@ -73,19 +73,6 @@ E o APIM acessível via `https://apim.api.internal` (somente de dentro da VNet).
 
 ---
 
-## 💰 Custos estimados
-
-| SKU | Suporta VNet | Custo aproximado (US$) |
-|-----|--------------|-----------------------|
-| Consumption | ❌ | pay-per-call |
-| Developer_1 | ✅ (sem SLA) | ~$50/mês |
-| Basic_v2 / Standard_v2 | ❌ (Internal) | — |
-| Premium_1 | ✅ | ~$2,800/mês |
-
-> 💡 Para tutoriais e ambientes de aprendizado use **Developer_1** — mesma feature set do Premium mas sem SLA e ~50x mais barato.
-
----
-
 ## ✅ Status da validação
 
 > Este tutorial foi **validado com uma execução real** em `Brazil South` usando a SKU `Developer_1`. Veja a saída completa em [docs/08-evidencia-validacao.md](docs/08-evidencia-validacao.md).
@@ -100,9 +87,3 @@ E o APIM acessível via `https://apim.api.internal` (somente de dentro da VNet).
 ## 🛡️ Licença
 
 Este projeto está licenciado sob os termos da licença incluída em [LICENSE](LICENSE).
-
----
-
-## ✍️ Autor
-
-**Ednei Monteiro** — [@EdneiMonteiro](https://github.com/EdneiMonteiro)
