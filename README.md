@@ -1,5 +1,10 @@
 # Internal APIM no Azure
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Azure](https://img.shields.io/badge/Cloud-Azure-0078D4?logo=microsoftazure&logoColor=white)](#)
+[![Last commit](https://img.shields.io/github/last-commit/EdneiMonteiro/internal-apim)](https://github.com/EdneiMonteiro/internal-apim/commits)
+[![ORCID](https://img.shields.io/badge/ORCID-0009--0006--0765--4201-A6CE39?logo=orcid&logoColor=white)](https://orcid.org/0009-0006-0765-4201)
+
 Tutorial completo de como provisionar um **Azure API Management** em modo **Internal VNet** — com explicação dos pré-requisitos, passo-a-passo via Portal e **Infrastructure as Code (Terraform)** pronto para uso.
 
 > ⚠️ Este repositório é um **tutorial / prova de conceito**. Antes de usar em produção, revise: segurança, escalabilidade, observabilidade, custos e conformidade. Veja [DISCLAIMER.md](./DISCLAIMER.md) e [SUPPORT.md](./SUPPORT.md).
