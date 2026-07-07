@@ -102,3 +102,8 @@ Este projeto está licenciado sob os termos da licença incluída em [LICENSE](L
 - Sem SLA nem suporte oficial. Veja [SUPPORT.md](./SUPPORT.md).
 - Uso sujeito a [DISCLAIMER.md](./DISCLAIMER.md).
 - **Não afiliado nem endossado pela Microsoft.** Marcas usadas apenas para descrição.
+
+## 🤝 Contributing
+
+Issue and pull request creation is restricted to collaborators. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for details.
